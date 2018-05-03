@@ -4,7 +4,7 @@
  * File: sds.h
  * Created Date: Wednesday, May 2nd 2018, 8:46:24 pm
  * -----
- * Last Modified: Thu May 03 2018
+ * Last Modified: Fri May 04 2018
  * Modified By: Matthew Cheong
  * -----
  * **************************************************
@@ -42,3 +42,5 @@ void cleanMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
 
 void reader (void);
 void writer (void);
+void read (void);
+void write (void);

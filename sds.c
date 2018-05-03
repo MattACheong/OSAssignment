@@ -4,7 +4,7 @@
  * File: sds.c
  * Created Date: Wednesday, May 2nd 2018, 8:46:27 pm
  * -----
- * Last Modified: Thu May 03 2018
+ * Last Modified: Fri May 04 2018
  * Modified By: Matthew Cheong
  * -----
  * **************************************************
@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
      &data_bufferFD, &trackerFD,
      &semaphores, &writeNext, &numReading, &data_buffer, &tracker);
 
-    // Readers
+    // Create Readers
     for( ii = 1; ii <= numReaders; ii++)
     {
         if(pid > 0)
@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
         reader();
     }
 
-    // Writers
+    // Create writers
     for( ii = 1; ii <= numWriters; ii++)
     {
         if(pid > 0)
@@ -185,9 +185,21 @@ void cleanMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
 
 void reader (void)
 {
+    //lock
+    read();
+    // unlock
     exit(1);
 }
 void writer (void)
 {
+    //lock
+    read();
+    // unlock
     exit(1);
+}
+void read (void)
+{
+}
+void write (void)
+{
 }
