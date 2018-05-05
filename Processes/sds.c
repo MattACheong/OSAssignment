@@ -46,11 +46,11 @@ int main(int argc, char* argv[])
     values->writeNext = 0;
 
     // Read in arguments
-    char* fileName = argv[1];
-    values->numReaders = atoi(argv[2]);
-    values->numWriters = atoi(argv[3]);
-    values->sleepRead = atoi(argv[4]);
-    values->sleepWrite = atoi(argv[5]);
+    char* fileName = SHARED_DATA;
+    values->numReaders = atoi(argv[1]);
+    values->numWriters = atoi(argv[2]);
+    values->sleepRead = atoi(argv[3]);
+    values->sleepWrite = atoi(argv[4]);
 
     // Read in file
     FILE* f = fopen(fileName, "r");
@@ -116,19 +116,19 @@ int main(int argc, char* argv[])
 void validateArgs(int argc, char* argv[])
 {
     // Ensure correct number of command line parameters
-    if(argc != 6)
+    if(argc != 5)
     {
-        fprintf(stderr, "Incorrect number of parameters.\n5 expected\n");
+        fprintf(stderr, "Incorrect number of parameters.\n4 expected\n");
         exit(1);
     }
     // Ensure at least one reader and writer
-    if(atoi(argv[2]) < 1 || atoi(argv[3]) < 1)
+    if(atoi(argv[1]) < 1 || atoi(argv[2]) < 1)
     {
         fprintf(stderr, "Must have at least 1 reader and 1 writer\n");
         exit(1);
     }
     // Ensure sleep time is positive
-    if(atoi(argv[4]) < 0 || atoi(argv[5]) < 0)
+    if(atoi(argv[3]) < 0 || atoi(argv[4]) < 0)
     {
         fprintf(stderr, "Wait times must be positive\n");
         exit(1);

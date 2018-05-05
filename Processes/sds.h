@@ -22,6 +22,7 @@
 #include <sys/wait.h>
 
 #define BUFFER_SIZE 20
+#define SHARED_DATA "shared_data"
 #define SHARED_DATA_SIZE 100
 
 typedef struct
