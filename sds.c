@@ -4,7 +4,7 @@
  * File: sds.c
  * Created Date: Wednesday, May 2nd 2018, 8:46:27 pm
  * -----
- * Last Modified: Fri May 04 2018
+ * Last Modified: Sat May 05 2018
  * Modified By: Matthew Cheong
  * -----
  * **************************************************
@@ -24,10 +24,10 @@ int main(int argc, char* argv[])
 
     // Variables
     int ii;
-    int pid = 23546;
+    int pid = 23546;        //Set parent pid
 
     // Shared Memory Declaration
-    sem_t *semaphores;
+    sem_t semMutEx, semReader, semWriter, *semaphores;
     int writeNext, numReading, *data_buffer, *tracker;
     
     // File Descriptors
@@ -35,12 +35,20 @@ int main(int argc, char* argv[])
     trackerFD;
 
     initMemory(&semaphoresFD, &writeNextFD, &numReadingFD,
-     &data_bufferFD, &trackerFD);
+    &data_bufferFD, &trackerFD);
 
     mapMemory(&semaphoresFD, &writeNextFD, &numReadingFD,
-     &data_bufferFD, &trackerFD,
-     &semaphores, &writeNext, &numReading, &data_buffer, &tracker);
+    &data_bufferFD, &trackerFD,
+    &semaphores, &writeNext, &numReading, &data_buffer, &tracker);
 
+    // Initialize semaphores
+    if((sem_init(&semMutEx, 1, 1) == 1) || (sem_init(&semReader, 1, 1) == 1) ||
+    (sem_init(&semWriter, 1, 1) == 1))
+    {
+        fprintf(stderr, "Could not initialize semaphore\n");
+        exit(1);
+    }
+     
     // Create Readers
     for( ii = 1; ii <= numReaders; ii++)
     {
@@ -53,7 +61,8 @@ int main(int argc, char* argv[])
     if(pid == 0)
     {
         printf("R<%d>: I live!\n", getpid());
-        reader();
+        reader(&semaphores, &writeNext, &numReading,
+     &data_buffer, &tracker);
     }
 
     // Create writers
@@ -68,12 +77,13 @@ int main(int argc, char* argv[])
     if(pid == 0)
     {
         printf("W<%d>: I live!\n", getpid());        
-        writer();
+        writer(&semaphores, &writeNext, &numReading,
+    &data_buffer, &tracker);
     }
     
     cleanMemory(&semaphoresFD, &writeNextFD, &numReadingFD,
-     &data_bufferFD, &trackerFD,
-     &semaphores, &writeNext, &numReading, &data_buffer, &tracker);
+    &data_bufferFD, &trackerFD,
+    &semaphores, &writeNext, &numReading, &data_buffer, &tracker);
     
     return (0);
 }
@@ -87,11 +97,23 @@ void validateArgs(int argc, char* argv[])
         printf("Incorrect number of parameters.\n4 expected\n");
         exit(1);
     }
+    // Ensure at least one reader and writer
+    if(argv[1] < 1 || argv[2] < 1)
+    {
+        printf("Must have at least 1 reader and 1 writer\n");
+        exit(1);
+    }
+    // Ensure sleep time is positive
+    if(argv[3] < 0 || argv[4] < 0)
+    {
+        printf("Wait times must be positive\n");
+        exit(1);
+    }
 }
 
 // Initializes the shared memory
 void initMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
-     int* data_bufferFD, int* trackerFD)
+    int* data_bufferFD, int* trackerFD)
 {
      *semaphoresFD = shm_open("semaphores", O_CREAT | O_RDWR, 0666);
      *writeNextFD = shm_open("writeNext", O_CREAT | O_RDWR, 0666);
@@ -100,8 +122,7 @@ void initMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
      *trackerFD = shm_open("tracker", O_CREAT | O_RDWR, 0666);
 
     // Check if created correctly
-    if(*semaphoresFD == -1 || *writeNextFD == -1 || *numReadingFD == -1
-        || *data_bufferFD == -1 || *trackerFD == -1)
+    if(*semaphoresFD == -1 || *writeNextFD == -1 || *numReadingFD == -1 ||*data_bufferFD == -1 || *trackerFD == -1)
     {
         fprintf( stderr, "Error creating shared memory blocks\n" );
         exit(1);
@@ -137,9 +158,8 @@ void initMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
 
 // Map shared memory to addresses
 void mapMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
-     int* data_bufferFD, int* trackerFD,
-     sem_t** semaphores, int* writeNext, int* numReading,
-     int** data_buffer, int** tracker)
+int* data_bufferFD, int* trackerFD, sem_t** semaphores, int* writeNext,
+int* numReading, int** data_buffer, int** tracker)
 {
     *semaphores = mmap(NULL, sizeof(sem_t) * 2, PROT_READ | PROT_WRITE,
         MAP_SHARED, *semaphoresFD, 0);
@@ -153,9 +173,8 @@ void mapMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
         MAP_SHARED, *trackerFD, 0);
 }
 void cleanMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
-     int* data_bufferFD, int* trackerFD,
-     sem_t** semaphores, int* writeNext, int* numReading,
-     int** data_buffer, int** tracker)
+int* data_bufferFD, int* trackerFD, sem_t** semaphores, int* writeNext,
+int* numReading, int** data_buffer, int** tracker)
 {
     // Destroy semaphores
     sem_destroy(&((*semaphores)[0]));
@@ -183,23 +202,17 @@ void cleanMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
     munmap(*tracker, sizeof(int));   
 }
 
-void reader (void)
+void reader (sem_t** semaphores, int* writeNext, int* numReading,
+int** data_buffer, int** tracker)
 {
     //lock
-    read();
     // unlock
     exit(1);
 }
-void writer (void)
+void writer (sem_t** semaphores, int* writeNext, int* numReading,
+int** data_buffer, int** tracker)
 {
     //lock
-    read();
     // unlock
     exit(1);
-}
-void read (void)
-{
-}
-void write (void)
-{
 }
