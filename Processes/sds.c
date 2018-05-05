@@ -17,42 +17,42 @@ int main(int argc, char* argv[])
     validateArgs(argc, argv);
     
     // Read in arguments
-    int numReaders = atoi(argv[1]);
-    int numWriters = atoi(argv[2]);
-    int sleepRead = atoi(argv[3]);
-    int sleepWrite = atoi(argv[4]);
+    char* fileName = argv[1];
+    int numReaders = atoi(argv[2]);
+    int numWriters = atoi(argv[3]);
+    int sleepRead = atoi(argv[4]);
+    int sleepWrite = atoi(argv[5]);
 
     // Variables
     int ii;
     int pid = 23546;        //Set parent pid
 
     // Shared Memory Declaration
-    sem_t semMutEx, semReader, semWriter, *semaphores;
-    int writeNext, numReading, *data_buffer, *tracker;
+    Semaphores semaphores;
+    Values values;
+    int *data_buffer, *tracker;
     
     // File Descriptors
-    int semaphoresFD, writeNextFD, numReadingFD, data_bufferFD, 
-    trackerFD;
+    int semaphoresFD, valuesFD, data_bufferFD, trackerFD;
 
-    initMemory(&semaphoresFD, &writeNextFD, &numReadingFD,
-    &data_bufferFD, &trackerFD);
+    initMemory(&semaphoresFD, &valuesFD, &data_bufferFD, &trackerFD);
 
-    mapMemory(&semaphoresFD, &writeNextFD, &numReadingFD,
-    &data_bufferFD, &trackerFD,
-    &semaphores, &writeNext, &numReading, &data_buffer, &tracker);
-
-    // Initialize semaphores
-    if((sem_init(&semMutEx, 1, 1) == 1) || (sem_init(&semReader, 1, 1) == 1) ||
-    (sem_init(&semWriter, 1, 1) == 1))
+    mapMemory(&semaphoresFD, &valuesFD, &data_bufferFD, &trackerFD,
+    &semaphores, &values, &data_buffer, &tracker);
+    
+    // Initialize Data
+    for (ii = 0; ii <= BUFFER_SIZE; ii++)
     {
-        fprintf(stderr, "Could not initialize semaphore\n");
+        tracker[ii] = 0;
+    }
+
+    FILE* f = fopen(fileName, "r");
+    if(f = NULL)
+    {
+        fprintf(stderr, "Error opening file!\n");
         exit(1);
     }
 
-    semaphores[0] = semMutEx;
-    semaphores[1] = semReader;
-    semaphores[2] = semWriter;
-    
     // Create Readers
     for( ii = 1; ii <= numReaders; ii++)
     {
@@ -65,8 +65,7 @@ int main(int argc, char* argv[])
     if(pid == 0)
     {
         printf("R<%d>: I live!\n", getpid());
-        reader(&semaphores, &writeNext, &numReading,
-     &data_buffer, &tracker);
+        reader(&semaphores, &values, &data_buffer, &tracker);
     }
 
     // Create writers
@@ -81,13 +80,11 @@ int main(int argc, char* argv[])
     if(pid == 0)
     {
         printf("W<%d>: I live!\n", getpid());        
-        writer(&semaphores, &writeNext, &numReading,
-    &data_buffer, &tracker);
+        writer(&semaphores, &values, &data_buffer, &tracker);
     }
     
-    cleanMemory(&semaphoresFD, &writeNextFD, &numReadingFD,
-    &data_bufferFD, &trackerFD,
-    &semaphores, &writeNext, &numReading, &data_buffer, &tracker);
+    cleanMemory(&semaphoresFD, &valuesFD, &data_bufferFD, &trackerFD,
+    &semaphores, &values, &data_buffer, &tracker);
     
     return (0);
 }
@@ -96,39 +93,39 @@ int main(int argc, char* argv[])
 void validateArgs(int argc, char* argv[])
 {
     // Ensure correct number of command line parameters
-    if(argc != 5)
+    if(argc != 6)
     {
-        printf("Incorrect number of parameters.\n4 expected\n");
+        fprintf(stderr, "Incorrect number of parameters.\n5 expected\n");
         exit(1);
     }
     // Ensure at least one reader and writer
-    if(argv[1] < 1 || argv[2] < 1)
+    if(argv[2] < 1 || argv[3] < 1)
     {
-        printf("Must have at least 1 reader and 1 writer\n");
+        fprintf(stderr, "Must have at least 1 reader and 1 writer\n");
         exit(1);
     }
     // Ensure sleep time is positive
-    if(argv[3] < 0 || argv[4] < 0)
+    if(argv[4] < 0 || argv[5] < 0)
     {
-        printf("Wait times must be positive\n");
+        fprintf(stderr, "Wait times must be positive\n");
         exit(1);
     }
 }
 
 // Initializes the shared memory
-void initMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
-    int* data_bufferFD, int* trackerFD)
+void initMemory(int* semaphoresFD, int* valuesFD,
+int* data_bufferFD, int* trackerFD)
 {
      *semaphoresFD = shm_open("semaphores", O_CREAT | O_RDWR, 0666);
-     *writeNextFD = shm_open("writeNext", O_CREAT | O_RDWR, 0666);
-     *numReadingFD = shm_open("numReading", O_CREAT | O_RDWR, 0666);
+     *valuesFD = shm_open("values", O_CREAT | O_RDWR, 0666);
      *data_bufferFD = shm_open("data_buffer", O_CREAT | O_RDWR, 0666);
      *trackerFD = shm_open("tracker", O_CREAT | O_RDWR, 0666);
 
     // Check if created correctly
-    if(*semaphoresFD == -1 || *writeNextFD == -1 || *numReadingFD == -1 ||*data_bufferFD == -1 || *trackerFD == -1)
+    if(*semaphoresFD == -1 || *valuesFD == -1 ||
+    data_bufferFD == -1 || *trackerFD == -1)
     {
-        fprintf( stderr, "Error creating shared memory blocks\n" );
+        fprintf( stderr, "Error creating shared memory bsemaphores\n" );
         exit(1);
     }
 
@@ -138,14 +135,9 @@ void initMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
         fprintf( stderr, "Error setting size for semaphores\n" );
         exit(1);
     }
-    if(ftruncate(*writeNextFD, sizeof(int)) == -1 )
+    if(ftruncate(*valuesFD, sizeof(int)) == -1 )
     {
-        fprintf( stderr, "Error setting size for writeNext\n" );
-        exit(1);
-    }
-    if(ftruncate(*numReadingFD, sizeof(int)) == -1 )
-    {
-        fprintf( stderr, "Error setting size for numReading\n" );
+        fprintf( stderr, "Error setting size for values\n" );
         exit(1);
     }
     if(ftruncate(*data_bufferFD, sizeof(int)) == -1 )
@@ -161,63 +153,109 @@ void initMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
 }
 
 // Map shared memory to addresses
-void mapMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
-int* data_bufferFD, int* trackerFD, sem_t** semaphores, int* writeNext,
-int* numReading, int** data_buffer, int** tracker)
+void mapMemory(int* semaphoresFD, int* valuesFD,
+int* data_bufferFD, int* trackerFD,
+Semaphores* semaphores, Values* values,
+int** data_buffer, int** tracker)
 {
-    *semaphores = mmap(NULL, sizeof(sem_t) * 2, PROT_READ | PROT_WRITE,
-        MAP_SHARED, *semaphoresFD, 0);
-    *writeNext = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
-        MAP_SHARED, *writeNextFD, 0);
-    *numReading = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
-        MAP_SHARED, *numReadingFD, 0);
-    *data_buffer = (int*) mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
-        MAP_SHARED, *data_bufferFD, 0);
-    *tracker = (int*) mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
-        MAP_SHARED, *trackerFD, 0);
+    semaphores = mmap(NULL, sizeof(Semaphores), PROT_READ |
+    PROT_WRITE, MAP_SHARED, *semaphoresFD, 0);
+    values = mmap(NULL, sizeof(Values), PROT_READ | PROT_WRITE,
+    MAP_SHARED, *valuesFD, 0);
+    *data_buffer = (int*) mmap(NULL, sizeof(int) * BUFFER_SIZE, PROT_READ |
+    PROT_WRITE, MAP_SHARED, *data_bufferFD, 0);
+    *tracker = (int*) mmap(NULL, sizeof(int) * BUFFER_SIZE, PROT_READ |
+    PROT_WRITE, MAP_SHARED, *trackerFD, 0);
 }
-void cleanMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
-int* data_bufferFD, int* trackerFD, sem_t** semaphores, int* writeNext,
-int* numReading, int** data_buffer, int** tracker)
+
+// Initializes semaphores
+void initSemaphores(Semaphores* semaphores)
+{
+    int errCheck;
+    errCheck += sem_init( &semaphores->mutex, -1, 1 );
+    errCheck += sem_init( &semaphores->wrt, -1, 0 );
+    errCheck += sem_init( &semaphores->empty, -1, 1 );
+    if (errCheck != 0)
+    {
+        fprintf(stderr, "Could not initialize semaphore\n");
+        exit(1);
+    }
+}
+
+// Clears shared memory
+void cleanMemory(int* semaphoresFD, int* valuesFD,
+int* data_bufferFD, int* trackerFD,
+Semaphores* semaphores, Values* values,
+int** data_buffer, int** tracker)
 {
     // Destroy semaphores
-    sem_destroy(&((*semaphores)[0]));
-    sem_destroy(&((*semaphores)[1]));
-    sem_destroy(&((*semaphores)[2]));
+    sem_destroy(&semaphores->mutex);
+    sem_destroy(&semaphores->wrt);
+    sem_destroy(&semaphores->empty);
 
     // Clean up shared memory
     shm_unlink("semaphores");
-    shm_unlink("writeNext");
-    shm_unlink("numReading");
+    shm_unlink("values");
     shm_unlink("data_buffer");
     shm_unlink("tracker");
 
     // Close file descriptors
-    close(semaphoresFD);
-    close(writeNextFD);
-    close(numReadingFD);
-    close(data_bufferFD);
-    close(trackerFD);
+    close(*semaphoresFD);
+    close(*valuesFD);
+    close(*data_bufferFD);
+    close(*trackerFD);
 
     // Unmap memory
-    munmap(*semaphores, sizeof(sem_t) * 2);
-    munmap(*writeNext, sizeof(int));
-    munmap(*numReading, sizeof(int));
-    munmap(*data_buffer, sizeof(int));
-    munmap(*tracker, sizeof(int));   
+    munmap(semaphores, sizeof(Semaphores));
+    munmap(values, sizeof(Values));
+    munmap(*data_buffer, sizeof(int) * BUFFER_SIZE);
+    munmap(*tracker, sizeof(int) * BUFFER_SIZE);   
 }
 
-void reader (sem_t** semaphores, int* writeNext, int* numReading,
+void reader (Semaphores* semaphores, Values* values,
 int** data_buffer, int** tracker)
 {
-    //lock
-    // unlock
+    int readCount = 0;
+
+    while (readCount < SHARED_DATA_SIZE)
+    {
+        // Lock
+        sem_wait(&semaphores->mutex);
+        (values->numReading)++;
+        if(values->numReading == 1)
+            sem_wait(&semaphores->wrt);
+        sem_post(&semaphores->mutex);
+        
+        // Read
+        
+        readCount++;
+        
+        // Unlock
+        sem_wait(&semaphores->mutex);
+        (values->numReading)--;
+        if((values->numReading) == 0)
+            sem_post(&semaphores->wrt);
+        sem_post(&semaphores->mutex);
+    }
     exit(1);
 }
-void writer (sem_t** semaphores, int* writeNext, int* numReading,
+void writer (Semaphores* semaphores, Values* values,
 int** data_buffer, int** tracker)
 {
-    //lock
-    // unlock
+    while (values->writeNext < SHARED_DATA_SIZE)
+    {
+        sem_wait(&semaphores->wrt);
+
+        // Write
+        if(*tracker[values->writeNext] == 0)
+        {
+            // data_buffer[values->writeNext] = 
+        }
+
+        // Unlock
+        sem_post(&(semaphores->wrt));
+
+    }
+
     exit(1);
 }

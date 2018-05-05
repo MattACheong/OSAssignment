@@ -21,21 +21,41 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#define BUFFER_SIZE 20
+#define SHARED_DATA_SIZE 100
+
+typedef struct
+{
+    int writeNext;
+    int numReading;
+} Values;
+
+typedef struct
+{
+    sem_t mutex;
+    sem_t wrt;
+    sem_t empty;
+} Semaphores;
+
 void validateArgs(int argc, char* argv[]);
 
-void initMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
+void initMemory(int* semaphoresFD, int* valuesFD,
 int* data_bufferFD, int* trackerFD);
 
-void mapMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
-int* data_bufferFD, int* trackerFD, sem_t** semaphores, int* writeNext,
-int* numReading, int** data_buffer, int** tracker);
-
-void cleanMemory(int* semaphoresFD, int* writeNextFD, int* numReadingFD,
-int* data_bufferFD, int* trackerFD, sem_t** semaphores, int* writeNext,
-int* numReading, int** data_buffer, int** tracker);
-
-void reader (sem_t** semaphores, int* writeNext, int* numReading,
+void mapMemory(int* semaphoresFD, int* valuesFD,
+int* data_bufferFD, int* trackerFD,
+Semaphores* semaphores, Values* values,
 int** data_buffer, int** tracker);
 
-void writer (sem_t** semaphores, int* writeNext, int* numReading,
+void initSemaphores(Semaphores* semaphores);
+
+void cleanMemory(int* semaphoresFD, int* valuesFD,
+int* data_bufferFD, int* trackerFD,
+Semaphores* semaphores, Values* values,
+int** data_buffer, int** tracker);
+
+void reader (Semaphores* semaphores, Values* values,
+int** data_buffer, int** tracker);
+
+void writer (Semaphores* semaphores, Values* values,
 int** data_buffer, int** tracker);
