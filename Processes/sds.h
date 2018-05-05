@@ -4,7 +4,7 @@
  * File: sds.h
  * Created Date: Wednesday, May 2nd 2018, 8:46:24 pm
  * -----
- * Last Modified: Sat May 05 2018
+ * Last Modified: Sun May 06 2018
  * Modified By: Matthew Cheong
  * -----
  * **************************************************
@@ -26,8 +26,12 @@
 
 typedef struct
 {
-    int writeNext;
+    int numReaders;
+    int numWriters;
+    int sleepRead;
+    int sleepWrite;
     int numReading;
+    int writeNext;
 } Values;
 
 typedef struct
@@ -40,22 +44,22 @@ typedef struct
 void validateArgs(int argc, char* argv[]);
 
 void initMemory(int* semaphoresFD, int* valuesFD,
-int* data_bufferFD, int* trackerFD);
+int* data_bufferFD, int* trackerFD, int* sharedDataFD);
 
 void mapMemory(int* semaphoresFD, int* valuesFD,
-int* data_bufferFD, int* trackerFD,
-Semaphores* semaphores, Values* values,
-int** data_buffer, int** tracker);
+int* data_bufferFD, int* trackerFD, int* sharedDataFD,
+Semaphores** semaphores, Values** values,
+int** data_buffer, int** tracker, int** sharedData);
 
 void initSemaphores(Semaphores* semaphores);
 
 void cleanMemory(int* semaphoresFD, int* valuesFD,
-int* data_bufferFD, int* trackerFD,
-Semaphores* semaphores, Values* values,
-int** data_buffer, int** tracker);
+int* data_bufferFD, int* trackerFD, int* sharedDataFD,
+Semaphores** semaphores, Values** values,
+int** data_buffer, int** tracker, int** sharedData);
 
 void reader (Semaphores* semaphores, Values* values,
 int** data_buffer, int** tracker);
 
 void writer (Semaphores* semaphores, Values* values,
-int** data_buffer, int** tracker);
+int** data_buffer, int** tracker, int** sharedData);
