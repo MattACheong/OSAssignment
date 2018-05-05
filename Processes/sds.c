@@ -48,7 +48,11 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Could not initialize semaphore\n");
         exit(1);
     }
-     
+
+    semaphores[0] = semMutEx;
+    semaphores[1] = semReader;
+    semaphores[2] = semWriter;
+    
     // Create Readers
     for( ii = 1; ii <= numReaders; ii++)
     {
@@ -179,6 +183,7 @@ int* numReading, int** data_buffer, int** tracker)
     // Destroy semaphores
     sem_destroy(&((*semaphores)[0]));
     sem_destroy(&((*semaphores)[1]));
+    sem_destroy(&((*semaphores)[2]));
 
     // Clean up shared memory
     shm_unlink("semaphores");
