@@ -39,6 +39,7 @@ typedef struct
     sem_t mutex;
     sem_t wrt;
     sem_t empty;
+    sem_t full;
 } Semaphores;
 
 void validateArgs(int argc, char* argv[]);

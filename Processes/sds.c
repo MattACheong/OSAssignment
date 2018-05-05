@@ -14,7 +14,7 @@
 
 int main(int argc, char* argv[])
 {
-    validateArgs(argc, argv);    
+    validateArgs(argc, argv);
 
     // Variables
     int ii;
@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
     Semaphores* semaphores;
     Values* values;
     int *dataBuffer, *tracker, *sharedData;
-    
+
     // File Descriptors
     int semaphoresFD, valuesFD, dataBufferFD, trackerFD, sharedDataFD;
 
@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
     &sharedDataFD, &semaphores, &values, &dataBuffer, &tracker, &sharedData);
 
     initSemaphores(semaphores);
-    
+
     // Initialize Data
     for (ii = 0; ii <= BUFFER_SIZE; ii++)
     {
@@ -62,6 +62,15 @@ int main(int argc, char* argv[])
     for(ii = 0; ii < SHARED_DATA_SIZE; ii++)
     {
         fscanf(f, "%d ", &(sharedData[ii]));
+    }
+    fclose(f);
+
+    // Refreshes output file
+    f = fopen("sim_out", "w");
+    if(f == NULL)
+    {
+        fprintf(stderr, "Error opening file!\n");
+        exit(1);
     }
     fclose(f);
 
@@ -99,7 +108,7 @@ int main(int argc, char* argv[])
     }
     cleanMemory(&semaphoresFD, &valuesFD, &dataBufferFD, &trackerFD,
     &sharedDataFD, &semaphores, &values, &dataBuffer, &tracker, &sharedData);
-    
+
     return (0);
 }
 
@@ -138,7 +147,7 @@ int* dataBufferFD, int* trackerFD, int* sharedDataFD)
 
     // Check if created correctly
     if(*semaphoresFD == -1 || *valuesFD == -1 || *dataBufferFD == -1 ||
-        *trackerFD == -1 || *sharedDataFD == -1) 
+        *trackerFD == -1 || *sharedDataFD == -1)
     {
         fprintf( stderr, "Error creating shared memory\n" );
         exit(1);
@@ -197,6 +206,7 @@ void initSemaphores(Semaphores* semaphores)
     errCheck += sem_init(&semaphores->mutex, 1, 1);
     errCheck += sem_init(&semaphores->wrt, 1, 1);
     errCheck += sem_init(&semaphores->empty, 1, 1);
+    errCheck += sem_init(&semaphores->full, 1, 1);
     if (errCheck != 0)
     {
         fprintf(stderr, "Could not initialize semaphore\n");
@@ -214,6 +224,7 @@ int** dataBuffer, int** tracker, int** sharedData)
     sem_destroy(&(*semaphores)->mutex);
     sem_destroy(&(*semaphores)->wrt);
     sem_destroy(&(*semaphores)->empty);
+    sem_destroy(&(*semaphores)->full);
 
     // Clean up shared memory
     shm_unlink("semaphores");
@@ -241,13 +252,17 @@ int** dataBuffer, int** tracker, int** sharedData)
 void reader (Semaphores* semaphores, Values* values,
 int** dataBuffer, int** tracker)
 {
-    int readCount = 0, ii;
+    int ii, readCount = 0;
 
     printf("R <%d>: I live!\n", getpid());
 
     while (readCount < SHARED_DATA_SIZE)
     {
-        // Lock
+        // Locks if nothing to read
+        if(readCount == values->writeNext)
+            sem_wait(&semaphores->full);
+
+        // Locks when reading also unlocks any full writers
         sem_wait(&semaphores->mutex);
         printf("R <%d> set mutex\n", getpid());
         values->numReading++;
@@ -255,6 +270,7 @@ int** dataBuffer, int** tracker)
         if(values->numReading == 1)
         {
             sem_wait(&semaphores->wrt);
+            sem_post(&semaphores->empty);
             printf("R <%d> set wrt\n", getpid());
         }
         sem_post(&semaphores->mutex);
@@ -269,12 +285,7 @@ int** dataBuffer, int** tracker)
             ((*tracker)[readCount%BUFFER_SIZE])--;
             readCount++;
         }
-        // Allow writing again
-        if((*tracker)[readCount%BUFFER_SIZE] == 0)
-        {
-            sem_post(&semaphores->empty);
-        }
-        
+
         // Unlock
         sem_wait(&semaphores->mutex);
         printf("R <%d> set mutex\n", getpid());
@@ -290,6 +301,16 @@ int** dataBuffer, int** tracker)
         sleep(values->sleepRead);
     }
     printf("R <%d>: Signing off!\n", getpid());
+
+    // Write to file
+    FILE* f = fopen("sim_out", "a");
+
+    fprintf(f, "Reader %d has finished reading %d pieces of data from the data buffer\n", getpid(), readCount);
+    fclose(f);
+
+    // Decrements numReaders when they exit. Prevents deadlock on tracker
+    (values->numReaders)--;
+
     exit(1);
 }
 
@@ -297,15 +318,20 @@ int** dataBuffer, int** tracker)
 void writer (Semaphores* semaphores, Values* values,
 int** dataBuffer, int** tracker, int** sharedData)
 {
-    int ii;
+    int ii, writeCount = 0;
 
     printf("W <%d>: I live!\n", getpid());
-    
+
     while (values->writeNext < SHARED_DATA_SIZE)
     {
-        // Lock
+        // Locks if nothing to write
+        if((*tracker)[values->writeNext%BUFFER_SIZE] != 0)
+            sem_wait(&semaphores->empty);
+
+        // Locks when writing, unlocks any empty readers
         printf("W <%d> set wrt\n", getpid());
         sem_wait(&semaphores->wrt);
+        sem_post(&semaphores->full);
 
         // Write
         if((*tracker)[values->writeNext%BUFFER_SIZE] == 0 &&
@@ -328,11 +354,7 @@ int** dataBuffer, int** tracker, int** sharedData)
             }
             printf("}\n");
             (values->writeNext)++;
-        }
-        // If unable to write, allows readers to read
-        else
-        {
-            sem_wait(&semaphores->empty);
+            writeCount++;
         }
 
         // Unlock
@@ -343,5 +365,15 @@ int** dataBuffer, int** tracker, int** sharedData)
     }
 
     printf("W <%d>: Signing off!\n", getpid());
+
+    // Write to file
+    FILE* f = fopen("sim_out", "a");
+
+    fprintf(f, "Writer %d has finished writing %d pieces of data to the data buffer\n", getpid(), writeCount);
+    fclose(f);
+
+    // Ensures that no readers are left when writers have finished.
+    sem_post(&semaphores->empty);
+
     exit(1);
 }
