@@ -266,20 +266,15 @@ int** dataBuffer, int** tracker)
 
         // Locks when reading also unlocks any full writers
         sem_wait(&semaphores->mutex);
-        printf("R <%d> set mutex\n", getpid());
         values->numReading++;
-        printf("NumReading: %d\n",values->numReading);
         if(values->numReading == 1)
         {
             sem_wait(&semaphores->wrt);
             sem_post(&semaphores->empty);
-            printf("R <%d> set wrt\n", getpid());
         }
         sem_post(&semaphores->mutex);
-        printf("R <%d> release mutex\n", getpid());
 
         // Read
-        printf("%d and %d\n", readCount, values->writeNext);
         while(readCount < values->writeNext)
         {
             printf( "R <%d>: I read [%d] from data buffer[%d]!\n",
@@ -290,15 +285,12 @@ int** dataBuffer, int** tracker)
 
         // Unlock
         sem_wait(&semaphores->mutex);
-        printf("R <%d> set mutex\n", getpid());
         (values->numReading)--;
         if((values->numReading) == 0)
         {
             sem_post(&semaphores->wrt);
-            printf("R <%d> release wrt\n", getpid());
         }
         sem_post(&semaphores->mutex);
-        printf("R <%d> release mutex\n", getpid());
 
         sleep(values->sleepRead);
     }
@@ -331,7 +323,6 @@ int** dataBuffer, int** tracker, int** sharedData)
             sem_wait(&semaphores->empty);
 
         // Locks when writing, unlocks any empty readers
-        printf("W <%d> set wrt\n", getpid());
         sem_wait(&semaphores->wrt);
         sem_post(&semaphores->full);
 
@@ -361,7 +352,6 @@ int** dataBuffer, int** tracker, int** sharedData)
 
         // Unlock
         sem_post(&semaphores->wrt);
-        printf("W <%d> release wrt\n", getpid());
 
         sleep(values->sleepWrite);
     }
