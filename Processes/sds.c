@@ -102,6 +102,8 @@ int main(int argc, char* argv[])
         writer(semaphores, values, &dataBuffer, &tracker, &sharedData);
         printf("Write finished!\n");
     }
+
+    // Ensures children have time to exit
     for(ii = 0; ii < (values->numReaders+values->numWriters); ii++)
     {
         wait(NULL);
