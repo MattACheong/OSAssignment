@@ -4,7 +4,7 @@
  * File: sds.c
  * Created Date: Wednesday, May 2nd 2018, 8:46:27 pm
  * -----
- * Last Modified: Sun May 06 2018
+ * Last Modified: Mon May 07 2018
  * Modified By: Matthew Cheong
  * -----
  * **************************************************
@@ -280,7 +280,8 @@ int** dataBuffer, int** tracker)
         while(readCount < values->writeNext)
         {
             printf( "R <%d>: I read [%d] from data buffer[%d]!\n",
-                getpid(), (*dataBuffer)[readCount%BUFFER_SIZE, readCount%BUFFER_SIZE]);
+            getpid(), (*dataBuffer)[readCount%BUFFER_SIZE],
+            readCount%BUFFER_SIZE);
             ((*tracker)[readCount%BUFFER_SIZE])--;
             readCount++;
         }
@@ -335,7 +336,8 @@ int** dataBuffer, int** tracker, int** sharedData)
             (*dataBuffer)[values->writeNext%BUFFER_SIZE] =
                 (*sharedData)[values->writeNext];
             (*tracker)[values->writeNext%BUFFER_SIZE] = values->numReaders;
-            printf("W <%d>: I wrote [%d] to data buffer[%d]!\n", getpid(), (*sharedData)[values->writeNext], values->writeNext%BUFFER_SIZE);
+            printf("W <%d>: I wrote [%d] to data buffer[%d]!\n", getpid(),
+            (*sharedData)[values->writeNext], values->writeNext%BUFFER_SIZE);
             printf("W <%d>: Tracker: {", getpid());
             for(ii = 0; ii < BUFFER_SIZE; ii++)
             {
