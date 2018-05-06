@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
 
     // Variables
     int ii;
-    initMemory(&dataBuffer, &tracker, &sharedData, &values);
+    initMemory(&dataBuffer, &tracker, &sharedData);
 
     // Initialize Data
     for (ii = 0; ii <= BUFFER_SIZE; ii++)
@@ -84,12 +84,17 @@ int main(int argc, char* argv[])
     {
         pthread_create(&readers[ii], NULL, reader, NULL);
         pthread_detach(readers[ii]);
+
     }
 
     // Ensures children have time to exit
-    for(ii = 0; ii < (values.numReaders+values.numWriters); ii++)
+    for(ii = 0; ii < values.numWriters; ii++)
     {
-        wait(NULL);
+        pthread_join(writers[ii], NULL);
+    }
+    for(ii = 0; ii < values.numReaders; ii++)
+    {
+        pthread_join(readers[ii], NULL);
     }
 
     cleanMemory();
@@ -123,8 +128,7 @@ void validateArgs(int argc, char* argv[])
 }
 
 // Initializes memory
-void initMemory(int** dataBuffer, int** tracker, int** sharedData,
-Values* values)
+void initMemory(int** dataBuffer, int** tracker, int** sharedData)
 {
     pthread_mutex_init(&mutex, NULL);
     pthread_cond_init(&empty, NULL);
@@ -179,14 +183,9 @@ void* writer()
             printf("}\n");
             values.writeNext++;
             writeCount++;
-            
-        }
-        else
-        {
-            pthread_cond_wait(&empty, &mutex);
+            pthread_cond_signal(&full);
         }
         // Sends full signal and unlocks mutex
-        pthread_cond_signal(&full);
         pthread_mutex_unlock(&mutex);
         sleep(values.sleepWrite);
     }
@@ -214,17 +213,20 @@ void* reader()
     {
 
         pthread_mutex_lock(&mutex);
-        if(readCount == values.writeNext && readCount < SHARED_DATA_SIZE)
-        {
-            pthread_cond_wait(&full, &mutex);
-        }
+        // if(readCount == values.writeNext && readCount < SHARED_DATA_SIZE)
+        // {
+        //     pthread_cond_wait(&full, &mutex);
+        // }
         while(readCount < values.writeNext)
         {
             printf("R <%d>: I read [%d] from data buffer[%d]!\n",
             tid, dataBuffer[readCount % BUFFER_SIZE], readCount % BUFFER_SIZE);
             tracker[readCount % BUFFER_SIZE]--;
             readCount++;
-            pthread_cond_signal(&empty);
+            if(tracker[(readCount % BUFFER_SIZE )== 0])
+            {
+                pthread_cond_signal(&empty);
+            }
         }
         pthread_mutex_unlock(&mutex);
         

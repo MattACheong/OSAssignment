@@ -35,8 +35,7 @@ typedef struct
 } Values;
 
 void validateArgs(int argc, char* argv[]);
-void initMemory(int** dataBuffer, int** tracker, int** sharedData,
-Values* values);
+void initMemory(int** dataBuffer, int** tracker, int** sharedData);
 void cleanMemory(void);
 void* writer();
 void* reader();
