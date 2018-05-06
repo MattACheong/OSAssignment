@@ -16,7 +16,7 @@
 pthread_mutex_t mutex;
 pthread_cond_t empty;
 pthread_cond_t full;
-Values values;
+Values* values;
 int *dataBuffer, *tracker, *sharedData;
 
 int main(int argc, char* argv[])
@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
 
     // Variables
     int ii;
-    initMemory(&dataBuffer, &tracker, &sharedData);
+    initMemory(&dataBuffer, &tracker, &sharedData, &values);
 
     // Initialize Data
     for (ii = 0; ii <= BUFFER_SIZE; ii++)
@@ -33,20 +33,20 @@ int main(int argc, char* argv[])
         tracker[ii] = 0;
         dataBuffer[ii] = 0;
     }
-    values.writeNext = 0;
+    values->writeNext = 0;
 
     // Read in arguments
     char* fileName = SHARED_DATA;
-    values.numReaders = atoi(argv[1]);
-    values.numWriters = atoi(argv[2]);
-    values.sleepRead = atoi(argv[3]);
-    values.sleepWrite = atoi(argv[4]);
+    values->numReaders = atoi(argv[1]);
+    values->numWriters = atoi(argv[2]);
+    values->sleepRead = atoi(argv[3]);
+    values->sleepWrite = atoi(argv[4]);
 
     // Create threads
     pthread_t* writers = (pthread_t*)malloc(sizeof(pthread_t) *
-    values.numWriters);
+    values->numWriters);
     pthread_t* readers = (pthread_t*)malloc(sizeof(pthread_t) *
-    values.numReaders);
+    values->numReaders);
 
 
     // Read in file
@@ -74,13 +74,13 @@ int main(int argc, char* argv[])
     fclose(f);
 
     // Create Writers
-    for( ii = 1; ii <= values.numWriters; ii++)
+    for( ii = 1; ii <= values->numWriters; ii++)
     {
         pthread_create(&writers[ii], NULL, writer, NULL);
         pthread_detach(writers[ii]);
     }
     // Create Readers
-    for( ii = 1; ii <= values.numReaders; ii++)
+    for( ii = 1; ii <= values->numReaders; ii++)
     {
         pthread_create(&readers[ii], NULL, reader, NULL);
         pthread_detach(readers[ii]);
@@ -88,11 +88,11 @@ int main(int argc, char* argv[])
     }
 
     // Ensures children have time to exit
-    for(ii = 0; ii < values.numWriters; ii++)
+    for(ii = 0; ii < values->numWriters; ii++)
     {
         pthread_join(writers[ii], NULL);
     }
-    for(ii = 0; ii < values.numReaders; ii++)
+    for(ii = 0; ii < values->numReaders; ii++)
     {
         pthread_join(readers[ii], NULL);
     }
@@ -128,14 +128,15 @@ void validateArgs(int argc, char* argv[])
 }
 
 // Initializes memory
-void initMemory(int** dataBuffer, int** tracker, int** sharedData)
+void initMemory(int** dataBuffer, int** tracker, int** sharedData, Values** values)
 {
     pthread_mutex_init(&mutex, NULL);
     pthread_cond_init(&empty, NULL);
     pthread_cond_init(&full, NULL);
-    *dataBuffer = (int*)malloc(sizeof(int)*BUFFER_SIZE);
-    *tracker = (int*)malloc(sizeof(int)*BUFFER_SIZE);
-    *sharedData = (int*)malloc(sizeof(int)*SHARED_DATA_SIZE);
+    *dataBuffer = (int*) malloc(sizeof(int) * BUFFER_SIZE);
+    *tracker = (int*) malloc(sizeof(int) * BUFFER_SIZE);
+    *sharedData = (int*) malloc(sizeof(int) * SHARED_DATA_SIZE);
+    *values = (Values*) malloc(sizeof(Values));
 }
 
 void cleanMemory(void)
@@ -156,19 +157,19 @@ void* writer()
 
     printf("W <%d>: I live!\n", tid);
 
-    while(values.writeNext < SHARED_DATA_SIZE)
+    while(values->writeNext < SHARED_DATA_SIZE)
     {
         // Locks mutex
         pthread_mutex_lock(&mutex);
-        if(tracker[values.writeNext % BUFFER_SIZE] == 0 &&
-        values.writeNext < SHARED_DATA_SIZE)
+        if(tracker[values->writeNext % BUFFER_SIZE] == 0 &&
+        values->writeNext < SHARED_DATA_SIZE)
         {
             // Waits for signal before continuing
-            dataBuffer[values.writeNext % BUFFER_SIZE] =
-            sharedData[values.writeNext];
-            tracker[values.writeNext] = values.numReaders;
+            dataBuffer[values->writeNext % BUFFER_SIZE] =
+            sharedData[values->writeNext];
+            tracker[values->writeNext] = values->numReaders;
             printf("W <%d>: I wrote [%d] to data buffer[%d]!\n", tid,
-            sharedData[values.writeNext], values.writeNext % BUFFER_SIZE);
+            sharedData[values->writeNext], values->writeNext % BUFFER_SIZE);
             printf("W <%d>: Tracker: {", tid);
             for(ii = 0; ii < BUFFER_SIZE; ii++)
             {
@@ -181,13 +182,13 @@ void* writer()
                 printf("%d ", dataBuffer[ii]);
             }
             printf("}\n");
-            values.writeNext++;
+            values->writeNext++;
             writeCount++;
             pthread_cond_signal(&full);
         }
         // Sends full signal and unlocks mutex
         pthread_mutex_unlock(&mutex);
-        sleep(values.sleepWrite);
+        sleep(values->sleepWrite);
     }
     printf("W <%d>: Signing off!\n", getpid());
     
@@ -217,7 +218,7 @@ void* reader()
         // {
         //     pthread_cond_wait(&full, &mutex);
         // }
-        while(readCount < values.writeNext)
+        while(readCount < values->writeNext)
         {
             printf("R <%d>: I read [%d] from data buffer[%d]!\n",
             tid, dataBuffer[readCount % BUFFER_SIZE], readCount % BUFFER_SIZE);
@@ -230,7 +231,7 @@ void* reader()
         }
         pthread_mutex_unlock(&mutex);
         
-        sleep(values.sleepRead);
+        sleep(values->sleepRead);
     }
 
     FILE* f = fopen("sim_out", "a");
@@ -240,7 +241,7 @@ void* reader()
     fclose(f);
 
     // Decrements numReaders when they exit. Prevents deadlock on tracker
-    values.numReaders--;
+    values->numReaders--;
 
     pthread_exit(0);
 }
