@@ -6,9 +6,56 @@
 
 ### Mutual Exclusion
 
-### Problems
+Since threads share memory, I have to use the pthread commands to get the
+threads to wait until the signal was raised.
+
+I had 1 mutex: `mutex` and 2 conditions: `full` and `empty`
+
+Below is the rough chain of events that has to be performed to
+ensure mutual exclusion.
+
+#### Writer
+
+```
+locks mutex
+wait empty
+writes to data buffer
+signals full so readers can read
+unlocks mutex
+```
+
+#### Reader
+
+```
+locks mutex
+wait full
+reads from data buffer
+    signals empty so writers can write
+unlocks mutex
+```
+
+### Problems / Tests
+
+Threads did not work well for me. Memory allocation for threads have eluded me.
+I've also noticed that some threads start when they should not be starting,
+completely bypassing the locked mutex. This can be somewhat alleviated by using
+print statements as they seem to cause a small delay, preventing the threads
+doing odd things.
+
+Unfortunately I was unable to figure out the crippling bug
+limiting the program. As I finished processes before threads,
+it was easier to write out the program before testing.
 
 ### Sample Input/Output
+
+```
+R <128100096>: I live!
+W <102921984>: I live!
+R <128100096>: I read [1] from data buffer[0]!
+W <102921984>: I wrote [2] to data buffer[1]!
+W <102921984>: Tracker: {4 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
+W <102921984>: dataBuffer: {1 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
+```
 
 ## Processes
 
@@ -42,7 +89,8 @@ if readers == 0
 unlocks mutex
 exit
 ```
-Above was a general solution for a reader-writer problem. However, with our assignment, we have to also account for the bounded buffer problem.
+Above was a general solution for a reader-writer problem. However, with our
+assignment, we have to also account for the bounded buffer problem.
 That's where the other 2 semaphores, `empty` and `full` come in.
 
 #### Writer
@@ -62,7 +110,7 @@ exit
 The writer will lock itself with `full` if there is nothing left to write.
 It will unlock it either when it runs out of things to read
 or when it finishes writing. As writers will finish before all readers unlock,
-they have to unlock `empty` when they start to exit so that all readers can 
+they have to unlock `empty` when they start to exit so that all readers can
 read to the end.
 
 #### Reader
