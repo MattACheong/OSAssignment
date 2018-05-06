@@ -112,7 +112,9 @@ int main(int argc, char* argv[])
     &sharedDataFD, &semaphores, &values, &dataBuffer, &tracker, &sharedData);
 
     return (0);
-}
+}// End main
+
+// **************************************************
 
 // Validates the command-line arguments
 void validateArgs(int argc, char* argv[])
