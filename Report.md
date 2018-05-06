@@ -97,7 +97,10 @@ then I ran the program with valgrind to check for any leaks.
 Since there were none, I proceeded to check the program at `./sds 100 100 0 0`.
 When that yielded no errors, I tried again at `./sds 1000 1000 0 0`.
 There were no problems as all readers and writers were able to exit if `sim_out`
-is checked.
+is checked. Occasionally, the program would show signs that it wasn't able to do
+certain heavy-biased conditions, but I have yet to determine if that is due to
+the server being taxed by other OS students as after stopping, it would continue
+after a while.
 
 ### Sample Input/Output
 
